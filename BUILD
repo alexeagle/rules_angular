@@ -19,7 +19,7 @@ exports_files(["LICENSE"])
 # Workaround for https://github.com/bazelbuild/bazel/issues/374
 filegroup(
     name = "node_modules",
-    srcs = glob(["node_modules/**/*"]),
+    srcs = glob(["node_modules/**/*.js"]),
     visibility = ["//visibility:public"],
 )
 

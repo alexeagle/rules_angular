@@ -27,9 +27,10 @@ load("@build_bazel_rules_typescript//internal:common/json_marshal.bzl", "json_ma
 def _expected_outs(ctx):
   result = []
 
+  lenpkg = len(ctx.label.package) + 1 if ctx.label.package else 0
   for src in ctx.files.srcs:
     if src.short_path.endswith(".ts"):
-      basename = src.short_path[len(ctx.label.package) + 1:-3]
+      basename = src.short_path[lenpkg:-len(".ts")]
       result += [ctx.new_file(ctx.bin_dir, basename + ext) for ext in [
         ".ngfactory.js",
         ".ngfactory.d.ts",
@@ -38,7 +39,7 @@ def _expected_outs(ctx):
         ".ngsummary.json",
       ]]
     elif src.short_path.endswith(".css"):
-      basename = src.short_path[len(ctx.label.package) + 1:-4]
+      basename = src.short_path[lenpkg:-len(".css")]
       result += [ctx.new_file(ctx.bin_dir, basename + ext) for ext in [
         ".css.shim.ngstyle.js",
         ".css.shim.ngstyle.d.ts",
@@ -48,9 +49,10 @@ def _expected_outs(ctx):
   return result
 
 def _ngc_tsconfig(ctx, files, srcs, **kwargs):
-  return dict(tsc_wrapped_tsconfig(ctx, files, srcs, **kwargs), **{
+  return dict(tsc_wrapped_tsconfig(ctx, [f for f in files if not f.short_path.endswith("d.ts")], srcs, **kwargs), **{
       "angularCompilerOptions": {
           "expectedOut": [o.path for o in _expected_outs(ctx)],
+          "generateCodeForLibraries": False,
       }
   })
 
@@ -67,10 +69,16 @@ def _compile_action(ctx, inputs, outputs, config_file_path):
   for externs_file in externs_files:
     ctx.file_action(output=externs_file, content="")
 
-  action_inputs = inputs
+  summaries = []
+  for dep in ctx.attr.deps:
+    if hasattr(dep, "angular"):
+      summaries += dep.angular.summaries
+
+  action_inputs = inputs + summaries
   if hasattr(ctx.attr, "node_modules"):
     action_inputs += [f for f in ctx.files.node_modules
                       if f.path.endswith(".ts") or f.path.endswith(".json")]
+
   if ctx.file.tsconfig:
     action_inputs += [ctx.file.tsconfig]
 
@@ -132,6 +140,9 @@ def _ng_module_impl(ctx):
   addl_declarations = [o for o in _expected_outs(ctx) if o.path.endswith(".d.ts")]
   ts_providers["typescript"]["declarations"] += addl_declarations
   ts_providers["typescript"]["transitive_declarations"] += addl_declarations
+  ts_providers["angular"] = {
+    "summaries": [o for o in _expected_outs(ctx) if o.path.endswith(".ngsummary.json")]
+  }
 
   return ts_providers_dict_to_struct(ts_providers)
 
