@@ -44,10 +44,7 @@ def ng_test(name, node_modules, ng_config, project_name = None, srcs = [], deps 
         chdir = native.package_name(),
         args = ["test", project_name, "--no-watch"],
         entry_point = ng_entry_point(name, node_modules),
-        data = srcs + deps + TEST_CONFIG + [
-            ng_config,
-            ":ng-package",
-        ],
+        data = srcs + deps + TEST_CONFIG + [ng_config],
         log_level = "debug",
         **kwargs
     )
